@@ -5,9 +5,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - '**'
-      - '.github/workflows/build-apk.yml'
 
 jobs:
   build:
@@ -26,36 +23,39 @@ jobs:
       - name: Set Up Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Install Android SDK Packages
+        run: |
+          yes | sdkmanager --licenses || true
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
       - name: Extract SiftCord Project ZIP
         run: |
           mkdir -p project
           ZIP_FILE=$(find . -maxdepth 1 -iname "*.zip" | head -n 1)
           if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: Project ZIP not found in repository root."
+            echo "Project ZIP not found!"
             exit 1
           fi
           unzip -o "$ZIP_FILE" -d project
 
       - name: Locate Android Project
         run: |
-          find project -name gradlew -type f
           GRADLEW=$(find project -name gradlew -type f | head -n 1)
           if [ -z "$GRADLEW" ]; then
-            echo "ERROR: gradlew not found inside ZIP."
+            echo "gradlew not found!"
             exit 1
           fi
-          echo "GRADLEW=$GRADLEW" >> "$GITHUB_ENV"
           echo "PROJECT_DIR=$(dirname "$GRADLEW")" >> "$GITHUB_ENV"
 
       - name: Build Debug APK
         run: |
           cd "$PROJECT_DIR"
-          chmod +x ./gradlew
+          chmod +x gradlew
           ./gradlew assembleDebug --stacktrace
 
       - name: Upload SiftCord APK
         uses: actions/upload-artifact@v4
         with:
           name: SiftCord-APK
-          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
+          path: project/**/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
