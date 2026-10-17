@@ -21,39 +21,51 @@ jobs:
           java-version: '17'
 
       - name: Set Up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
 
-      - name: Install Android SDK Packages
-        run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+      - name: Accept Android Licenses
+        run: yes | sdkmanager --licenses || true
 
-      - name: Extract SiftCord Project ZIP
+      - name: Install Required SDK Packages
+        run: sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Find Project ZIP
         run: |
-          mkdir -p project
-          ZIP_FILE=$(find . -maxdepth 1 -iname "*.zip" | head -n 1)
+          ZIP_FILE=$(find . -maxdepth 1 -type f -iname "*.zip" | head -n 1)
+
           if [ -z "$ZIP_FILE" ]; then
-            echo "Project ZIP not found!"
+            echo "ERROR: SiftCord ZIP not found in repository root!"
             exit 1
           fi
+
+          echo "ZIP_FILE=$ZIP_FILE" >> "$GITHUB_ENV"
+
+      - name: Extract SiftCord Project
+        run: |
+          mkdir -p project
           unzip -o "$ZIP_FILE" -d project
 
       - name: Locate Android Project
         run: |
-          GRADLEW=$(find project -name gradlew -type f | head -n 1)
+          GRADLEW=$(find project -type f -name gradlew | head -n 1)
+
           if [ -z "$GRADLEW" ]; then
-            echo "gradlew not found!"
+            echo "ERROR: gradlew not found inside ZIP!"
             exit 1
           fi
-          echo "PROJECT_DIR=$(dirname "$GRADLEW")" >> "$GITHUB_ENV"
 
-      - name: Build Debug APK
+          PROJECT_DIR=$(dirname "$GRADLEW")
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+      - name: Build SiftCord APK
         run: |
           cd "$PROJECT_DIR"
           chmod +x gradlew
           ./gradlew assembleDebug --stacktrace
 
-      - name: Upload SiftCord APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: SiftCord-APK
