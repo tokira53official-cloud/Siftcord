@@ -29,20 +29,30 @@ jobs:
       - name: Install Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Extract Siftcord project
+      - name: Install required Android packages
+        run: |
+          yes | sdkmanager --licenses || true
+          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Extract Siftcord ZIP
         run: |
           sudo apt-get update
           sudo apt-get install -y unzip
-          mkdir project
+          mkdir -p project
           unzip -o Siftcord_GitHub_Starter.zip -d project
-          find project -maxdepth 5 -type f
+          echo "Extracted project files:"
+          find project -maxdepth 5 -type f | head -100
 
-      - name: Build APK
+      - name: Locate Android project
+        run: |
+          find project -name settings.gradle -o -name settings.gradle.kts
+
+      - name: Build Siftcord APK
         run: |
           cd project
-          gradle assembleDebug
+          gradle assembleDebug --stacktrace
 
-      - name: Upload APK
+      - name: Upload Siftcord APK
         uses: actions/upload-artifact@v4
         with:
           name: Siftcord-APK
