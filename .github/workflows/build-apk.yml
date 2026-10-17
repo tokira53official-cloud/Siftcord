@@ -19,53 +19,57 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+          cache: gradle
 
       - name: Set Up Android SDK
         uses: android-actions/setup-android@v4
         with:
           packages: 'platform-tools'
 
-      - name: Accept Android Licenses
-        run: yes | sdkmanager --licenses || true
+      - name: Install Android SDK Packages
+        run: |
+          yes | sdkmanager --licenses || true
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Install Required SDK Packages
-        run: sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
-
-      - name: Find Project ZIP
+      - name: Find and Extract SiftCord ZIP
         run: |
           ZIP_FILE=$(find . -maxdepth 1 -type f -iname "*.zip" | head -n 1)
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: SiftCord ZIP not found in repository root!"
+            echo "ERROR: ZIP file not found in repository root."
             exit 1
           fi
 
-          echo "ZIP_FILE=$ZIP_FILE" >> "$GITHUB_ENV"
-
-      - name: Extract SiftCord Project
-        run: |
           mkdir -p project
           unzip -o "$ZIP_FILE" -d project
 
       - name: Locate Android Project
         run: |
-          GRADLEW=$(find project -type f -name gradlew | head -n 1)
+          GRADLE_FILE=$(find project -type f -name "build.gradle" | grep -v "/app/" | head -n 1)
 
-          if [ -z "$GRADLEW" ]; then
-            echo "ERROR: gradlew not found inside ZIP!"
+          if [ -z "$GRADLE_FILE" ]; then
+            echo "ERROR: Root build.gradle not found inside ZIP."
+            find project -maxdepth 5 -type f
             exit 1
           fi
 
-          PROJECT_DIR=$(dirname "$GRADLEW")
+          PROJECT_DIR=$(dirname "$GRADLE_FILE")
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+          echo "Android project found at: $PROJECT_DIR"
+          ls -la "$PROJECT_DIR"
+
+      - name: Install Gradle
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gradle
 
       - name: Build SiftCord APK
         run: |
           cd "$PROJECT_DIR"
-          chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace
+          gradle assembleDebug --no-daemon --stacktrace
 
-      - name: Upload APK
+      - name: Upload SiftCord APK
         uses: actions/upload-artifact@v4
         with:
           name: SiftCord-APK
