@@ -23,16 +23,17 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-
       - name: Install Android SDK
         uses: android-actions/setup-android@v3
+        continue-on-error: true
 
-      - name: Install required Android packages
+      - name: Configure Android SDK
         run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Extract Siftcord ZIP
         run: |
@@ -40,19 +41,18 @@ jobs:
           sudo apt-get install -y unzip
           mkdir -p project
           unzip -o Siftcord_GitHub_Starter.zip -d project
-          echo "Extracted project files:"
           find project -maxdepth 5 -type f | head -100
 
-      - name: Locate Android project
+      - name: Find Gradle project
         run: |
-          find project -name settings.gradle -o -name settings.gradle.kts
+          find project -type f \( -name settings.gradle -o -name settings.gradle.kts \)
 
-      - name: Build Siftcord APK
+      - name: Build APK
         run: |
           cd project
           gradle assembleDebug --stacktrace
 
-      - name: Upload Siftcord APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Siftcord-APK
