@@ -25,64 +25,52 @@ jobs:
         with:
           packages: 'platform-tools'
 
-      - name: Install Android SDK Packages
+      - name: Install Android SDK
         run: |
           yes | sdkmanager --licenses || true
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Find and Extract SiftCord ZIP
+      - name: Extract SiftCord Project
         run: |
           ZIP_FILE=$(find . -maxdepth 1 -type f -iname "*.zip" | head -n 1)
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: ZIP file not found in repository root!"
+            echo "ERROR: SiftCord ZIP not found!"
             exit 1
           fi
-
-          echo "Found ZIP: $ZIP_FILE"
 
           mkdir -p project
           unzip -o "$ZIP_FILE" -d project
 
       - name: Locate Android Project
         run: |
-          GRADLE_FILE=$(find project -type f -name "build.gradle" | grep -v "/app/" | head -n 1)
+          SETTINGS=$(find project -type f -name "settings.gradle" | head -n 1)
 
-          if [ -z "$GRADLE_FILE" ]; then
-            echo "ERROR: Root build.gradle not found!"
-            echo "Files inside extracted ZIP:"
-            find project -maxdepth 6 -type f
+          if [ -z "$SETTINGS" ]; then
+            echo "ERROR: settings.gradle not found!"
             exit 1
           fi
 
-          PROJECT_DIR=$(dirname "$GRADLE_FILE")
+          PROJECT_DIR=$(dirname "$SETTINGS")
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-          echo "Android project found: $PROJECT_DIR"
-          ls -la "$PROJECT_DIR"
+          echo "Project location: $PROJECT_DIR"
+          cat "$SETTINGS"
 
-      - name: Install Gradle
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gradle
-
-          gradle --version
+      - name: Set Up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
 
       - name: Build SiftCord APK
         run: |
           cd "$PROJECT_DIR"
+          gradle --version
           gradle assembleDebug --no-daemon --stacktrace
 
-      - name: Verify APK
+      - name: Find APK
         run: |
-          APK_FILE=$(find "$PROJECT_DIR" -type f -path "*/build/outputs/apk/debug/*.apk" | head -n 1)
-
-          if [ -z "$APK_FILE" ]; then
-            echo "ERROR: APK was not generated!"
-            exit 1
-          fi
-
-          echo "APK generated successfully: $APK_FILE"
+          find "$PROJECT_DIR" -type f -name "*.apk"
 
       - name: Upload SiftCord APK
         uses: actions/upload-artifact@v4
